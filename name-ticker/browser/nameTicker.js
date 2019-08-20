@@ -4,7 +4,7 @@ const nameTicker = ({
     tickSpeed = 5,
     pingSpeed = 8,
     ...rest
-}) => Object.assign({node, dataSource, tickSpeed, pingSpeed, ...rest}, {
+} = {}) => ({node, dataSource, tickSpeed, pingSpeed,
     init({
         NameStore = {},
         NameList = [],
@@ -30,7 +30,7 @@ const nameTicker = ({
             return this;
         },
         ...rest
-    }) {
+    } = {}) {
         if (typeof this.dataSource === 'function') {
             fetchNames = () => this.dataSource();
         }
@@ -56,7 +56,8 @@ const nameTicker = ({
         }
 
         return this;
-    }
-})
+    },
+    ...rest
+});
 
-let ticker = nameTicker({}).init({});
+let ticker = nameTicker().init();
