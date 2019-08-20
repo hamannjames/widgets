@@ -5,42 +5,58 @@ const nameTicker = ({
     pingSpeed = 8,
     ...rest
 }) => Object.assign({node, dataSource, tickSpeed, pingSpeed, ...rest}, {
-    NameStore: {},
-    NameList: [],
-    fetchNames: undefined,
-    prepareNames: undefined,
-    update: undefined,
-    validateURL: ((regex) => url => {console.log(regex); return (typeof url === 'string' && url.match(regex).length)})(/^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm),
-    addNames() {
-        this.DonorList = this.DonorList.concat(this.fetchNames().filter(name => {
-            if (!this.NameStore[name]) {
-                this.NameStore[name] = 1;
-                return true;
+    init({
+        NameStore = {},
+        NameList = [],
+        fetchNames = undefined,
+        prepareNames = undefined,
+        update = () => {
+            try {
+                this.addNames();
             }
-        }));
+            catch (e) {
+                console.log(e);
+            }
+        },
+        setURLValidation = regex => url => url.match(regex).length,
+        addNames = () => {
+            this.DonorList = this.DonorList.concat(this.fetchNames().filter(name => {
+                if (!this.NameStore[name]) {
+                    this.NameStore[name] = 1;
+                    return true;
+                }
+            }));
 
-        return this;
-    },
-    init() {
+            return this;
+        },
+        ...rest
+    }) {
         if (typeof this.dataSource === 'function') {
-            this.fetchNames = () => this.dataSource();
+            fetchNames = () => this.dataSource();
         }
         else if(Array.isArray(this.dataSource)) {
-            this.fetchNames = () => this.dataSource;
+            fetchNames = () => this.dataSource;
         }
         else if(typeof this.dataSource === 'object') {
-            this.fetchNames = () => this.prepareNames(dataSource);
+            fetchNames = () => prepareNames(this.dataSource);
         }
-        else if(this.validateURL(this.dataSource)) {
-            this.fetchNames = () => {
-                fetch(dataSource)
-                .then(names => names.json())
-                .then(names => names)
-                .catch(e => { throw e })
+        else if(typeof this.dataSource === 'string') {
+            this.validateDataSourceURL = setURLValidation(/^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm).bind(this, this.dataSource);
+            if (this.validateDataSourceURL()) {
+                fetchNames = () => {
+                    fetch(this.dataSource)
+                    .then(names => names.json())
+                    .then(names => names)
+                    .catch(e => { throw e })
+                }
             }
         }
         else {
             throw new Error('nameTicker initialized without a valid dataSource');
         }
+
+        return this;
     }
 })
+
+let ticker = nameTicker({}).init({});
