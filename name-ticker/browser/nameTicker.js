@@ -1,5 +1,5 @@
 const nameTicker = ({
-    node = document.getElementsByTagName('body')[0],
+    node = undefined,
     dataSource = [],
     tickSpeed = 5,
     pingSpeed = 8,
@@ -29,35 +29,59 @@ const nameTicker = ({
 
             return this;
         },
-        ...rest
-    } = {}) {
-        if (typeof this.dataSource === 'function') {
-            fetchNames = () => this.dataSource();
-        }
-        else if(Array.isArray(this.dataSource)) {
-            fetchNames = () => this.dataSource;
-        }
-        else if(typeof this.dataSource === 'object') {
-            fetchNames = () => prepareNames(this.dataSource);
-        }
-        else if(typeof this.dataSource === 'string') {
-            this.validateDataSourceURL = setURLValidation(/^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm).bind(this, this.dataSource);
-            if (this.validateDataSourceURL()) {
-                fetchNames = () => {
-                    fetch(this.dataSource)
+        setNode = (node) => {
+            if (!node) {
+                throw new Error('setNode called without a valid node element or selector');
+            }
+
+            if (!(node instanceof HTMLElement)) {
+                node = document.querySelector(node);
+
+                if (!node) {
+                    throw new Error('setNode called without a valid node element or selector');
+                }
+            }
+
+            this.node = node;
+
+            return this;
+        },
+        setFetch = (dataSource) => {
+            if (typeof dataSource === 'function') {
+                fetchNames = () => dataSource();
+            }
+            else if(Array.isArray(dataSource)) {
+                fetchNames = () => dataSource;
+            }
+            else if(typeof dataSource === 'object') {
+                fetchNames = () => prepareNames(dataSource);
+            }
+            else if(typeof dataSource === 'string') {
+                this.validateDataSourceURL = setURLValidation(/^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm).bind(this, this.dataSource);
+                if (this.validateDataSourceURL()) {
+                    fetchNames = fetch(dataSource)
                     .then(names => names.json())
                     .then(names => names)
                     .catch(e => { throw e })
                 }
             }
+            else {
+                throw new Error('nameTicker initialized without proper dataSource');
+            }
+
+            return this;
+        },
+        ...rest
+    } = {}) {
+        try {
+            setNode(this.node);
+            setFetch(this.dataSource);
         }
-        else {
-            throw new Error('nameTicker initialized without a valid dataSource');
+        catch(e) {
+            console.log(e);
         }
 
         return this;
     },
     ...rest
 });
-
-let ticker = nameTicker().init();
