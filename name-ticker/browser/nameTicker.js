@@ -1,87 +1,108 @@
-const nameTicker = ({
-    node = undefined,
-    dataSource = [],
-    tickSpeed = 5,
-    pingSpeed = 8,
-    ...rest
-} = {}) => ({node, dataSource, tickSpeed, pingSpeed,
-    init({
-        NameStore = {},
-        NameList = [],
-        fetchNames = undefined,
-        prepareNames = undefined,
-        update = () => {
+if (window.nameTicker === undefined) {
+    window.nameTicker = ({
+        node = undefined,
+        dataSource = [],
+        tickSpeed = 5,
+        pingSpeed = 8,
+        ...rest
+    } = {}) => ({node, tickSpeed, pingSpeed,
+        init({
+            prepareNames = () => dataSource,
+            URLRegex = /^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm,
+            ...rest
+        } = {}) {
+            const NameStore = new Set();
+            let fetchNames = undefined;
+            const setFetch = (data) => {
+                if (typeof data === 'function') {
+                    fetchNames = () => dataSource();
+                }
+                else if(Array.isArray(data)) {
+                    fetchNames = () => data;
+                }
+                else if(typeof data === 'object') {
+                    fetchNames = () => prepareNames(data);
+                }
+                else if(typeof data === 'string') {
+                    try {
+                        data.match(URLRegex).length;
+                        fetchNames = () => {
+                            fetch(data)
+                            .then(names => names.json())
+                            .then(names => names)
+                            .catch(e => { throw e })
+                        }
+                    }
+                    catch (e) {
+                        throw new Error('nameTicker initialized without valid URL String');
+                    }
+                }
+                else {
+                    throw new Error('nameTicker initialized without proper dataSource');
+                }
+
+                return this;
+            }
+            const update = () => {
+                try {
+                    this.addNames(fetchNames());
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+
             try {
-                this.addNames();
+                setFetch(dataSource);
             }
             catch (e) {
                 console.log(e);
             }
-        },
-        setURLValidation = regex => url => url.match(regex).length,
-        addNames = () => {
-            this.DonorList = this.DonorList.concat(this.fetchNames().filter(name => {
-                if (!this.NameStore[name]) {
-                    this.NameStore[name] = 1;
-                    return true;
-                }
-            }));
 
-            return this;
-        },
-        setNode = (node) => {
-            if (!node) {
-                throw new Error('setNode called without a valid node element or selector');
-            }
+            const methods = {
+                addNames(names) {
+                    if (!names || !names.length) {
+                        throw 'No New Names';
+                    }
+                    names = names.filter(name => !NameStore.has(name));
+                    if (!names.length) {
+                        throw 'No New Names';
+                    }
+                    names.map(name => NameStore.add(name));
+                    return this;
+                },
+                getNames() {
+                    return NameStore;
+                },
+                setDataSource(data) {
+                    try {
+                        setFetch(data);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                },
+                setNode(node) {
+                    if (!node) {
+                        throw new Error('setNode called without a valid node element or selector');
+                    }
 
-            if (!(node instanceof HTMLElement)) {
-                node = document.querySelector(node);
+                    if (!(node instanceof HTMLElement)) {
+                        node = document.querySelector(node);
 
-                if (!node) {
-                    throw new Error('setNode called without a valid node element or selector');
-                }
-            }
+                        if (!node) {
+                            throw new Error('setNode called without a valid node element or selector');
+                        }
+                    }
 
-            this.node = node;
+                    this.node = node;
 
-            return this;
-        },
-        setFetch = (dataSource) => {
-            if (typeof dataSource === 'function') {
-                fetchNames = () => dataSource();
-            }
-            else if(Array.isArray(dataSource)) {
-                fetchNames = () => dataSource;
-            }
-            else if(typeof dataSource === 'object') {
-                fetchNames = () => prepareNames(dataSource);
-            }
-            else if(typeof dataSource === 'string') {
-                this.validateDataSourceURL = setURLValidation(/^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm).bind(this, this.dataSource);
-                if (this.validateDataSourceURL()) {
-                    fetchNames = fetch(dataSource)
-                    .then(names => names.json())
-                    .then(names => names)
-                    .catch(e => { throw e })
+                    return this;
                 }
             }
-            else {
-                throw new Error('nameTicker initialized without proper dataSource');
-            }
 
-            return this;
+            return {...this, ...methods};
         },
         ...rest
-    } = {}) {
-        try {
-            setNode(this.node);
-            setFetch(this.dataSource);
-        }
-        catch(e) {
-            console.log(e);
-        }
-
-        return this;
-    },
-    ...rest
-});
+    });
+}
