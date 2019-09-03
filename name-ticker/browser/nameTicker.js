@@ -94,7 +94,6 @@ if (window.nameTicker === undefined) {
                 ]);
 
                 [...EventMap].forEach(event => {
-                    console.log(event);
                     EventMap.set(event[0], {
                         handler: eventHandler.bind(EventMap.get(event[0])),
                         callbacks: EventMap.get(event[0]).callbacks
