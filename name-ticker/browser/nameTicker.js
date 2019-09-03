@@ -4,8 +4,8 @@ if (window.nameTicker === undefined) {
         dataSource = [],
         tickSpeed = 5,
         pingSpeed = 8,
-        willInit = undefined,
-        didInit = undefined,
+        willInit = () => {console.log('will init')},
+        didInit = (e) => {console.log(`nameTicker initialized at ${(node || 'undefined node')}`); return true},
         onTick = undefined,
         onPing = undefined,
         ...rest
@@ -67,36 +67,39 @@ if (window.nameTicker === undefined) {
                     names.map(name => NameStore.add(name));
                     return this;
                 }
-                const handleWillInit = (e) => {
-                    EventMap.get('nameTicker.willInitialize').callbacks.forEach(cb => {
-                        if (cb === 'function') {
-                            cb(e);
-                        }
-                    })
-                }
-                const handleDidInit = (e) => {
+                const eventHandler = function() {
+                    let e = arguments[0];
                     try {
-                        EventMap.get('nameTicker.DidInitialize').callbacks.forEach(cb => {
-                            if (cb === 'function') {
-                                cb(e);
-                                if (e.cancelBubble) {
-                                    throw (e);
+                        this.callbacks.forEach((cb, index) => {
+                            if (typeof cb === 'function') {
+                                
+                                if (!cb(e)) {
+                                    throw (e.type + ' event loop stopped at event ' + index);
                                 }
                             }
                         })
                     }
-                    catch(e) {
+                    catch (e) {
                         console.log(e);
                     }
                 }
+
                 const EventMap = new Map([
-                    ['nameTicker.willInitialize', {handler: handleWillInit, callbacks: [willInit]}],
-                    ['nameTicker.didInitialize', {handler: handleDidInit, callbacks: [didInit]},
-                    ['nameTicker.willTick', [onTick]],
-                    ['nameTicker.didTick', []],
-                    ['nameTicker.willPing', [onPing]],
-                    ['nameTicker.didPing', []]
+                    ['nameTicker.willInitialize', {handler: undefined, callbacks: [willInit]}],
+                    ['nameTicker.didInitialize', {handler: undefined, callbacks: [didInit]}],
+                    ['nameTicker.willTick', {handler: undefined, callbacks: []}],
+                    ['nameTicker.didTick', {handler: undefined, callbacks: []}],
+                    ['nameTicker.willPing', {handler: undefined, callbacks: []}],
+                    ['nameTicker.didPing', {handler: undefined, callbacks: []}]
                 ]);
+
+                [...EventMap].forEach(event => {
+                    console.log(event);
+                    EventMap.set(event[0], {
+                        handler: eventHandler.bind(EventMap.get(event[0])),
+                        callbacks: EventMap.get(event[0]).callbacks
+                    });
+                });
 
                 const methods = {
                     updateNameStore() {
@@ -127,7 +130,6 @@ if (window.nameTicker === undefined) {
                                 bubbles: true,
                                 cancelable: true,
                                 detail: {
-                                    callback: EventMap.get(event).handle,
                                     ticker: this,
                                     ...ops
                                 }
@@ -153,10 +155,17 @@ if (window.nameTicker === undefined) {
                     },
                     addCallbacks({...events} = {}) {
                         for (event of [...EventMap]) {
+                            document.removeEventListener(event[0], EventMap.get(event[0]).handler);
                             if (events[event[0]] && typeof events[event[0]] === 'function') {
-                                (this.node || document).removeEventListener()
-                                EventMap.set(event[0], event[1].concat([events[event[0]]]));
+                                let callbacks = {
+                                    callbacks: events['prepend'] ? [events[event[0]]].concat(event[1].callbacks) : event[1].callbacks.concat([events[event[0]]])
+                                }
+                                EventMap.set(event[0], {
+                                    callbacks: callbacks.callbacks,
+                                    handler: eventHandler.bind(callbacks)
+                                });
                             }
+                            document.addEventListener(event[0], EventMap.get(event[0]).handler);
                         }
                         return this;
                     }
