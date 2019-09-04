@@ -4,16 +4,15 @@ if (window.nameTicker === undefined) {
         dataSource = [],
         tickSpeed = 5,
         pingSpeed = 8,
-        willInit = () => {console.log('will init')},
-        didInit = (e) => {console.log(`nameTicker initialized at ${(node || 'undefined node')}`); return true},
+        index = 0,
+        willInit = (e) => { console.log('a nameTicker will initialize at ' + (node || 'undefined node')); return e.detail.ticker },
+        didInit = (e) => { console.log(`a nameTicker did initialize at ${(node || 'undefined node')} at ${index}`); return e.detail.ticker },
         onTick = undefined,
         onPing = undefined,
         ...rest
     } = {}) => {
         const initialState = {
             node,
-            tickSpeed,
-            pingSpeed,
             ...rest
         }
         return {...initialState,
@@ -22,10 +21,8 @@ if (window.nameTicker === undefined) {
                 URLRegex = /^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm,
                 ...rest
             } = {}) {
-                let nextIndex = 0;
-                let ping = undefined;
+                let tick, ping, fetchNames;
                 const NameStore = new Set();
-                let fetchNames = undefined;
                 const setFetch = (data) => {
                     if (typeof data === 'function') {
                         fetchNames = () => dataSource();
@@ -125,7 +122,7 @@ if (window.nameTicker === undefined) {
                     },
                     dispatch(event, ops = {}) {
                         try {
-                            this.node.dispatchEvent(new CustomEvent(event, {
+                            (this.node instanceof HTMLElement ? this.node : document).dispatchEvent(new CustomEvent(event, {
                                 bubbles: true,
                                 cancelable: true,
                                 detail: {
@@ -133,6 +130,7 @@ if (window.nameTicker === undefined) {
                                     ...ops
                                 }
                             }));
+                            return this;
                         }
                         catch(e) {
                             console.log(e);
@@ -150,33 +148,45 @@ if (window.nameTicker === undefined) {
                             return this;
                         }
 
-                        this.dispatch('nameTicker.restart', Object.assign(initialState, {node}))
+                        this.dispatch('nameTicker.restart', Object.assign(initialState, {node, index: nextIndex}))
                     },
                     addCallbacks({...events} = {}) {
                         for (event of [...EventMap]) {
                             document.removeEventListener(event[0], EventMap.get(event[0]).handler);
+                            let handlerObject = event[1];
                             if (events[event[0]] && typeof events[event[0]] === 'function') {
-                                let callbacks = {
-                                    callbacks: events['prepend'] ? [events[event[0]]].concat(event[1].callbacks) : event[1].callbacks.concat([events[event[0]]])
-                                }
+                                handlerObject.callbacks = events['prepend'] ? [events[event[0]]].concat(handlerObject.callbacks) : handlerObject.callbacks.concat([events[event[0]]]);
+                                handlerObject.handler = eventHandler.bind(handlerObject.callbacks);
                                 EventMap.set(event[0], {
-                                    callbacks: callbacks.callbacks,
-                                    handler: eventHandler.bind(callbacks)
+                                    handlerObject
                                 });
                             }
-                            document.addEventListener(event[0], EventMap.get(event[0]).handler);
+                            if (handlerObject.callbacks.length) {
+                                document.addEventListener(event[0], EventMap.get(event[0]).handler);
+                            }
                         }
                         return this;
+                    },
+                    setIndex(val) {
+                        try {
+                            return !isNaN(index = parseInt(val))
+                        }
+                        catch(e) {
+                            console.log(e);
+                        }
+                    },
+                    getIndex() {
+                        return index;
                     }
                 }
+                
+                document.removeEventListener('nameTicker.willInitialize', EventMap.get('nameTicker.willInitialize').handler);
+                document.addEventListener('nameTicker.willInitialize', EventMap.get('nameTicker.willInitialize').handler);
+
+                methods.dispatch.call(this, 'nameTicker.willInitialize');
 
                 try {
-                    if (this.dispatch) {
-                        this.dispatch('nameTicker.willInitialize');
-                    }
-                    Object.assign(setFetch(dataSource), methods).setNode(this.node, true).addCallbacks();
-                    this.dispatch('nameTicker.didInitialize');
-                    return this;
+                    return Object.assign(setFetch(dataSource), methods).setNode(this.node, true).addCallbacks().dispatch('nameTicker.didInitialize');
                 }
                 catch (e) {
                     console.log(e);
