@@ -11,6 +11,7 @@ if (window.nameTicker === undefined) {
         onPing = undefined,
         ...rest
     } = {}) => {
+        let initialized = false;
         const initialState = {
             node,
             ...rest
@@ -21,6 +22,9 @@ if (window.nameTicker === undefined) {
                 URLRegex = /^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm,
                 ...rest
             } = {}) {
+                if (initialized) {
+                    throw new Error('nameTicker already initialized. Please use restart.')
+                }
                 let tick, ping, fetchNames;
                 const NameStore = new Set();
                 const setFetch = (data) => {
@@ -50,6 +54,8 @@ if (window.nameTicker === undefined) {
                     else {
                         throw new Error('nameTicker initialized without proper dataSource');
                     }
+
+                    initialized = true;
 
                     return this;
                 }
