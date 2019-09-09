@@ -95,6 +95,10 @@ if (window.nameTicker === undefined) {
                     }
                 }
 
+                const getNameAtIndex = (index) => {
+                    return this.getNames()[index];
+                }
+
                 const EventMap = new Map([
                     ['nameTicker.willInitialize', {handler: undefined, callbacks: [willInit]}],
                     ['nameTicker.didInitialize', {handler: undefined, callbacks: [didInit]}],
@@ -232,20 +236,43 @@ if (window.nameTicker === undefined) {
                     setTick(speed) {
                         tickSpeed = (!isNaN(parseInt(speed))) ? parseInt(speed) : tickSpeed;
                         clearInterval(tick);
-                        tick = setInterval(() => {
-                            try {
-                                this.next();
-                            }
-                            catch(e) {
-                                throw e;
-                            }
-                        }, tickSpeed);
-                        console.log('nameTicker ticking at ' + tickSpeed + ' pace');
-                        return this;
+                        try {
+                            this.next();
+                            tick = setInterval(() => {
+                                try {
+                                    this.next();
+                                }
+                                catch(e) {
+                                    console.log(e);
+                                    setTimeout(() => {
+                                        tick = this.setTick();
+                                    })
+                                }
+                            }, tickSpeed);
+                            console.log('nameTicker ticking at ' + tickSpeed + ' pace');
+                            return this;
+                        }
+                        catch(e) {
+                            console.log(e);
+                            setTimeout(() => {
+                                tick = this.setTick();
+                            })
+                        }
+                        finally {
+                            return this;
+                        }
                     },
                     next() {
-                        console.log(startIndex);
-                        startIndex++;
+                        if (updating) {
+                            throw 'nameTicker is updating';
+                        }
+                        else {
+                            console.log(getNameAtIndex(startIndex));
+                            startIndex = (startIndex + 1 >= this.getNames().length) ? 0 : startIndex + 1;
+                        }
+                    },
+                    setUpdate(status) {
+                        updating = status;
                     }
                 }
                 
