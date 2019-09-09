@@ -95,6 +95,27 @@ if (window.nameTicker === undefined) {
                     }
                 }
 
+                const scheduleTick = (timer, keep) => {
+                    return setTimeout(() => {
+                        try {
+                            this.next();
+                            tick = scheduleTick(tickSpeed, keep);
+                        }
+                        catch(e) {
+                            console.log(e);
+                            clearTick();
+                            if (keep) {
+                                tick = scheduleTick(300, keep);
+                            }
+                        }
+                    }, timer);
+                }
+
+                const clearTick = () => {
+                    clearInterval(tick);
+                    clearTimeout(tick);
+                }
+
                 const getNameAtIndex = (index) => {
                     return this.getNames()[index];
                 }
@@ -235,28 +256,13 @@ if (window.nameTicker === undefined) {
                     },
                     setTick(speed) {
                         tickSpeed = (!isNaN(parseInt(speed))) ? parseInt(speed) : tickSpeed;
-                        clearInterval(tick);
+                        clearTick();
                         try {
-                            this.next();
-                            tick = setInterval(() => {
-                                try {
-                                    this.next();
-                                }
-                                catch(e) {
-                                    console.log(e);
-                                    setTimeout(() => {
-                                        tick = this.setTick();
-                                    })
-                                }
-                            }, tickSpeed);
+                            tick = scheduleTick(300, true);
                             console.log('nameTicker ticking at ' + tickSpeed + ' pace');
-                            return this;
                         }
                         catch(e) {
                             console.log(e);
-                            setTimeout(() => {
-                                tick = this.setTick();
-                            })
                         }
                         finally {
                             return this;
@@ -270,9 +276,6 @@ if (window.nameTicker === undefined) {
                             console.log(getNameAtIndex(startIndex));
                             startIndex = (startIndex + 1 >= this.getNames().length) ? 0 : startIndex + 1;
                         }
-                    },
-                    setUpdate(status) {
-                        updating = status;
                     }
                 }
                 
