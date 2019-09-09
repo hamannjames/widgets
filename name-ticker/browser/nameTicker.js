@@ -99,14 +99,23 @@ if (window.nameTicker === undefined) {
                     return setTimeout(() => {
                         try {
                             this.next();
-                            tick = scheduleTick(tickSpeed, keep);
+                            clearTick();
+                            tick = setInterval(() => {
+                                try {
+                                    this.next();
+                                }
+                                catch(e) {
+                                    console.log(e);
+                                    clearTick();
+                                    if (keep) {
+                                        tick = scheduleTick(300, keep);
+                                    }
+                                }
+                            }, tickSpeed)
                         }
                         catch(e) {
                             console.log(e);
                             clearTick();
-                            if (keep) {
-                                tick = scheduleTick(300, keep);
-                            }
                         }
                     }, timer);
                 }
