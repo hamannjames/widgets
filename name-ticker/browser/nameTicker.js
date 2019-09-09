@@ -2,11 +2,11 @@ if (window.nameTicker === undefined) {
     window.nameTicker = ({
         node = undefined,
         dataSource = [],
-        tickSpeed = 5,
-        pingSpeed = 8,
-        index = 0,
+        tickSpeed = 5000,
+        pingSpeed = 8000,
+        startIndex = 0,
         willInit = (e) => { console.log('a nameTicker will initialize at ' + (node || 'undefined node')); return e.detail.ticker },
-        didInit = (e) => { console.log(`a nameTicker did initialize at ${(node || 'undefined node')} at ${index}`); return e.detail.ticker },
+        didInit = (e) => { console.log(`a nameTicker did initialize at ${(node || 'undefined node')}`); return e.detail.ticker },
         onTick = undefined,
         onPing = undefined,
         ...rest
@@ -14,9 +14,17 @@ if (window.nameTicker === undefined) {
         let initialized = false;
         const initialState = {
             node,
+            dataSource,
+            tickSpeed,
+            pingSpeed,
+            startIndex,
+            willInit,
+            didInit,
+            onTick,
+            onPing,
             ...rest
         }
-        return {...initialState,
+        return {node,
             init({
                 prepareNames = () => dataSource,
                 URLRegex = /^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/gm,
@@ -25,8 +33,8 @@ if (window.nameTicker === undefined) {
                 if (initialized) {
                     throw new Error('nameTicker already initialized. Please use restart.')
                 }
-                let tick, ping, fetchNames;
-                const NameStore = new Set();
+                let tick, ping, fetchNames, looped = false, updating = false;
+                const NameStore = new Map();
                 const setFetch = (data) => {
                     if (typeof data === 'function') {
                         fetchNames = () => dataSource();
@@ -43,7 +51,7 @@ if (window.nameTicker === undefined) {
                             fetchNames = () => {
                                 fetch(data)
                                 .then(names => names.json())
-                                .then(names => names)
+                                .then(names => prepareNames(names))
                                 .catch(e => { throw e })
                             }
                         }
@@ -63,11 +71,11 @@ if (window.nameTicker === undefined) {
                     if (!names || !names.length) {
                         throw 'No New Names';
                     }
-                    names = names.filter(name => !NameStore.has(name));
+                    names = names.filter(name => !NameStore.get(name));
                     if (!names.length) {
                         throw 'No New Names';
                     }
-                    names.map(name => NameStore.add(name));
+                    names.map(name => NameStore.set(name, true));
                     return this;
                 }
                 const eventHandler = function() {
@@ -104,9 +112,14 @@ if (window.nameTicker === undefined) {
                 });
 
                 const methods = {
-                    updateNameStore() {
+                    updateNameStore(names) {
                         try {
-                            addNames(fetchNames());
+                            if (Array.isArray(names) && names.length) {
+                                addNames(names);
+                            }
+                            else {
+                                addNames(fetchNames());
+                            }
                         }
                         catch (e) {
                             console.log(e);
@@ -116,11 +129,27 @@ if (window.nameTicker === undefined) {
                         }
                     },
                     getNames() {
-                        return [...NameStore];
+                        return [...NameStore].reduce((filtered, name) => {
+                            if (name[1]) {
+                                filtered.push(name[0]);
+                            }
+                            return filtered;
+                        }, []);
                     },
-                    setDataSource(data) {
+                    removeNames(names) {
+                        if (!Array.isArray(names) || !names.length) {
+                            throw new Error('removeNames must be called with array of names');
+                        }
+
+                        names.forEach(name => {
+                            if (NameStore.get(name)) {
+                                NameStore.set(name, false);
+                            }
+                        })
+                    },
+                    setDataSource(dataSource) {
                         try {
-                            setFetch(data);
+                            setFetch(dataSource);
                         }
                         catch (e) {
                             console.log(e);
@@ -175,7 +204,7 @@ if (window.nameTicker === undefined) {
                     },
                     setIndex(val) {
                         try {
-                            return !isNaN(index = parseInt(val))
+                            return !isNaN(startIndex = parseInt(val))
                         }
                         catch(e) {
                             console.log(e);
@@ -183,6 +212,40 @@ if (window.nameTicker === undefined) {
                     },
                     getIndex() {
                         return index;
+                    },
+                    setPing(speed) {
+                        pingSpeed = (!isNaN(parseInt(speed))) ? parseInt(speed) : pingSpeed;
+                        clearInterval(ping);
+                        ping = setInterval(() => {
+                            updating = true;
+                            try {
+                                this.updateNameStore();
+                            }
+                            catch(e) {
+                                throw e;
+                            }
+                            finally {
+                                updating = false;
+                            }
+                        }, pingSpeed);
+                    },
+                    setTick(speed) {
+                        tickSpeed = (!isNaN(parseInt(speed))) ? parseInt(speed) : tickSpeed;
+                        clearInterval(tick);
+                        tick = setInterval(() => {
+                            try {
+                                this.next();
+                            }
+                            catch(e) {
+                                throw e;
+                            }
+                        }, tickSpeed);
+                        console.log('nameTicker ticking at ' + tickSpeed + ' pace');
+                        return this;
+                    },
+                    next() {
+                        console.log(startIndex);
+                        startIndex++;
                     }
                 }
                 
@@ -192,7 +255,7 @@ if (window.nameTicker === undefined) {
                 methods.dispatch.call(this, 'nameTicker.willInitialize');
 
                 try {
-                    return Object.assign(setFetch(dataSource), methods).setNode(this.node, true).addCallbacks().dispatch('nameTicker.didInitialize');
+                    return Object.assign(setFetch(dataSource), methods).updateNameStore().setNode(this.node, true).addCallbacks().dispatch('nameTicker.didInitialize');
                 }
                 catch (e) {
                     console.log(e);
